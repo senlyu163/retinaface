@@ -12,6 +12,7 @@
         <canvas id="canvas"></canvas>
     </div>
     <div>
+        <p id="load status">loading...</p>
         <p>Webassembly supporting:</p>
         <p id="wasm_support"></p>
     </div>
@@ -56,6 +57,8 @@
                     console.log('Emscripten boilerplate loaded.');
                 }
                 document.body.appendChild(script);
+                document.getElementById("load status").innerText = "Load successfully";
+
             });
 
         var colors = [
