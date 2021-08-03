@@ -1,0 +1,140 @@
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>retinaface</title>
+</head>
+
+<body>
+    <h3>retinaface</h3>
+    <input type="file" id="input" accept="image/*">
+    <div>
+        <canvas id="canvas"></canvas>
+    </div>
+    <div>
+        <p>Webassembly supporting:</p>
+        <p id="wasm_support"></p>
+    </div>
+
+    <script src="wasm-feature-detect.js" type="text/javascript"></script>
+    <script type='text/javascript'>
+
+        // check whether browser support webassembly
+        const supported = (() => {
+            try {
+                if (typeof WebAssembly === "object"
+                    && typeof WebAssembly.instantiate === "function") {
+                    const module = new WebAssembly.Module(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00));
+                    if (module instanceof WebAssembly.Module)
+                        return new WebAssembly.Instance(module) instanceof WebAssembly.Instance;
+                }
+            } catch (e) {
+            }
+            return false;
+        })();
+
+        console.log(supported ? "WebAssembly is supported" : "WebAssembly is not supported");
+        document.getElementById('wasm_support').innerText = supported ? "supported" : "not supported";
+
+        var Module = {};
+
+        wasmFeatureDetect.simd().then(simdSupported => {
+            if (simdSupported) {
+                Module['dynamicLibraries'] = ['libtennis-simd.wasm'];
+            } else {
+                Module['dynamicLibraries'] = ['libtennis.wasm'];
+            }
+        });
+
+        fetch('retinaface.wasm')
+            .then(response => response.arrayBuffer())
+            .then(buffer => {
+                Module.wasmBinary = buffer;
+                var script = document.createElement('script');
+                script.src = 'retinaface.js';
+                script.onload = function() {
+                    console.log('Emscripten boilerplate loaded.');
+                }
+                document.body.appendChild(script);
+            });
+
+        var colors = [
+            "rgb(176,  39, 156)",
+        ];
+
+        function retinaface() {
+            var canvas = document.getElementById('canvas');
+            var ctx = canvas.getContext('2d');
+
+            var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            var data = imageData.data;
+
+            dst = _malloc(canvas.width * canvas.height * 3);
+            HEAPU8.set(data, dst);
+
+            (async () => {
+                resultarray = new Float32Array(20 * 5);
+                resultbuffer = _malloc(20 * 5 * Float32Array.BYTES_PER_ELEMENT);
+                HEAPF32.set(resultarray, resultbuffer / Float32Array.BYTES_PER_ELEMENT);
+
+                _retinaface(dst, canvas.width, canvas.height, resultbuffer);
+
+                js_resultarray = HEAPF32.subarray(resultbuffer / Float32Array.BYTES_PER_ELEMENT, resultbuffer / Float32Array.BYTES_PER_ELEMENT + 5 * 20);
+
+                var i;
+                for (i = 0; i < 20; i++) {
+                    var bbox_x = js_resultarray[i * 5 + 0];
+                    var bbox_y = js_resultarray[i * 5 + 1];
+                    var bbox_w = js_resultarray[i * 5 + 2];
+                    var bbox_h = js_resultarray[i * 5 + 3];
+                    var prob = js_resultarray[i * 5 + 4];
+
+                    ctx.strokeStyle = colors[0];
+                    ctx.strokeRect(bbox_x, bbox_y, bbox_w, bbox_h);
+                    console.log("prob: ", prob);
+                }
+                delete resultarray;
+            })();
+            _free(resultbuffer);
+            _free(dst);
+        }
+
+        document.getElementById('input').onchange = function(e) {
+            var reader = new FileReader();
+            reader.onload = function(event) {
+                var img = new Image();
+                img.onload = function() {
+
+                    var canvas = document.getElementById('canvas');
+                    var ctx = canvas.getContext('2d');
+
+                    // scale down to 640x640
+                    var img_w = img.width;
+                    var img_h = img.height;
+
+                    // if (img_w > img_h) {
+                    //     img_h = img_h * 256 / img_w;
+                    //     img_w = 256;
+                    // }
+                    // else {
+                    //     img_w = img_w * 256 / img_h;
+                    //     img_h = 256;
+                    // }
+
+                    canvas.width = img_w;
+                    canvas.height = img_h;
+                    ctx.drawImage(img, 0, 0, img_w, img_h);
+
+                    retinaface()
+                }
+                img.src = event.target.result;
+            }
+            reader.readAsDataURL(e.target.files[0]);
+        };
+
+
+    </script>
+
+</body>
+
+</html>
