@@ -107,6 +107,8 @@
         }
         
         document.getElementById('input').onchange = function(e) {
+            var infer_ele = document.getElementById("infer_status");
+            infer_ele.innerText = "Infer status:";
             var reader = new FileReader();
             reader.onload = function(event) {
                 var img = new Image();
@@ -132,12 +134,10 @@
                     canvas.height = img_h;
                     ctx.drawImage(img, 0, 0, img_w, img_h);
 
-                    var infer_ele = document.getElementById("infer_status");
                     var infer_status_text = infer_ele.innerText;
                     infer_ele.innerText = infer_status_text + " infer...";
                     retinaface();
                     infer_ele.innerText = infer_status_text + " infer successfully";
-
                 }
                 img.src = event.target.result;
             }
