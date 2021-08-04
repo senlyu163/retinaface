@@ -7,14 +7,16 @@
 
 <body>
     <h3>retinaface</h3>
-    <input type="file" id="input" accept="image/*">
+    <div id="file_btn">
+        <input type="hidden" id="input" accept="image/*"></input>
+    </div>
     <div>
+        <p id="infer_status">Infer status:</p>
         <canvas id="canvas"></canvas>
     </div>
     <div>
-        <p id="load status">loading...</p>
-        <p>Webassembly supporting:</p>
-        <p id="wasm_support"></p>
+        <p id="loading">Load status:</p>
+        <p id="wasm_support">Webassembly supporting:</p>
     </div>
 
     <script src="wasm-feature-detect.js" type="text/javascript"></script>
@@ -35,7 +37,7 @@
         })();
 
         console.log(supported ? "WebAssembly is supported" : "WebAssembly is not supported");
-        document.getElementById('wasm_support').innerText = supported ? "supported" : "not supported";
+        document.getElementById('wasm_support').innerText = document.getElementById('wasm_support').innerText + (supported ? " supported" : " not supported");
 
         var Module = {};
 
@@ -57,33 +59,35 @@
                     console.log('Emscripten boilerplate loaded.');
                 }
                 document.body.appendChild(script);
-                document.getElementById("load status").innerText = "Load successfully";
-
+                var loading_ele = document.getElementById("loading");
+                loading_ele.innerText = loading_ele.innerText + " succeed";
+                var file_btn = document.getElementById('input');
+                file_btn.type = "file";
             });
-
-        var colors = [
-            "rgb(176,  39, 156)",
-        ];
-
-        function retinaface() {
+            
+            var colors = [
+                "rgb(176,  39, 156)",
+            ];
+            
+            function retinaface() {
             var canvas = document.getElementById('canvas');
             var ctx = canvas.getContext('2d');
 
             var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             var data = imageData.data;
-
+            
             dst = _malloc(canvas.width * canvas.height * 3);
             HEAPU8.set(data, dst);
-
+            
             (async () => {
                 resultarray = new Float32Array(20 * 5);
                 resultbuffer = _malloc(20 * 5 * Float32Array.BYTES_PER_ELEMENT);
                 HEAPF32.set(resultarray, resultbuffer / Float32Array.BYTES_PER_ELEMENT);
-
+                
                 _retinaface(dst, canvas.width, canvas.height, resultbuffer);
-
+                
                 js_resultarray = HEAPF32.subarray(resultbuffer / Float32Array.BYTES_PER_ELEMENT, resultbuffer / Float32Array.BYTES_PER_ELEMENT + 5 * 20);
-
+                
                 var i;
                 for (i = 0; i < 20; i++) {
                     var bbox_x = js_resultarray[i * 5 + 0];
@@ -91,7 +95,7 @@
                     var bbox_w = js_resultarray[i * 5 + 2];
                     var bbox_h = js_resultarray[i * 5 + 3];
                     var prob = js_resultarray[i * 5 + 4];
-
+                    
                     ctx.strokeStyle = colors[0];
                     ctx.strokeRect(bbox_x, bbox_y, bbox_w, bbox_h);
                     console.log("prob: ", prob);
@@ -101,7 +105,7 @@
             _free(resultbuffer);
             _free(dst);
         }
-
+        
         document.getElementById('input').onchange = function(e) {
             var reader = new FileReader();
             reader.onload = function(event) {
@@ -128,7 +132,12 @@
                     canvas.height = img_h;
                     ctx.drawImage(img, 0, 0, img_w, img_h);
 
-                    retinaface()
+                    var infer_ele = document.getElementById("infer_status");
+                    var infer_status_text = infer_ele.innerText;
+                    infer_ele.innerText = infer_status_text + " infer...";
+                    retinaface();
+                    infer_ele.innerText = infer_status_text + " infer successfully";
+
                 }
                 img.src = event.target.result;
             }
